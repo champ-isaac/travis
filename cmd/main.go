@@ -32,7 +32,7 @@ func main() {
 	//	Role:    "user",
 	//	Content: "what's Golang?",
 	//})
-	out := c.client.Streaming(ctx, model, models.Prompt{
+	out := c.client.AskStreaming(ctx, model, models.Prompt{
 		Role:    "user",
 		Content: "what's a Golang",
 	})
