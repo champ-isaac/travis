@@ -2,6 +2,7 @@ package openai
 
 import (
 	"context"
+	"errors"
 	"log"
 
 	"github.com/champ-isaac/travis/models"
@@ -80,6 +81,7 @@ func (c *Client) AskCompletion(ctx context.Context, model string, prompts ...mod
 			Messages:    completionMsgParamUnion,
 			Temperature: param.Opt[float64]{Value: 0.7},
 		})
+
 	if err != nil {
 		return "", err
 	}
@@ -91,9 +93,17 @@ func (c *Client) AskStreaming(ctx context.Context, model string, prompts ...mode
 
 	go func() {
 		defer close(out)
-
+		if len(prompts) == 0 {
+			out <- &models.StreamingOutput{Error: errors.New("no prompts specified")}
+			return
+		}
+		if prompts[0].Content == "" {
+			out <- &models.StreamingOutput{Error: errors.New("prompt content can't be empty")}
+			return
+		}
 		stream := c.client.Responses.NewStreaming(ctx, responses.ResponseNewParams{
 			Model: model,
+			//PreviousResponseID: param.Opt[string]{Value: ""},
 			Input: responses.ResponseNewParamsInputUnion{
 				OfString: param.Opt[string]{
 					Value: prompts[0].Content,
@@ -107,6 +117,8 @@ func (c *Client) AskStreaming(ctx context.Context, model string, prompts ...mode
 				out <- &models.StreamingOutput{Content: event.Delta}
 			case "response.completed":
 				log.Println("\n\n>>>>completed!")
+				//for streaming, can get response id when response completed
+				out <- &models.StreamingOutput{Id: event.Response.ID}
 			}
 		}
 		if err := stream.Err(); err != nil {
