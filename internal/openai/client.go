@@ -86,7 +86,7 @@ func (c *Client) AskCompletion(ctx context.Context, model string, prompts ...mod
 	return resp.Choices[0].Message.Content, nil
 }
 
-func (c *Client) Streaming(ctx context.Context, model string, prompts ...models.Prompt) <-chan *models.StreamingOutput {
+func (c *Client) AskStreaming(ctx context.Context, model string, prompts ...models.Prompt) <-chan *models.StreamingOutput {
 	out := make(chan *models.StreamingOutput)
 
 	go func() {
