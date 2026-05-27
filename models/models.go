@@ -6,6 +6,7 @@ type Prompt struct {
 }
 
 type StreamingOutput struct {
+	Id      string `json:"id"`
 	Content string `json:"content,omitempty"`
 	Error   error  `json:"error"`
 }
