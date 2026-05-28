@@ -14,7 +14,7 @@ import (
 )
 
 type Client struct {
-	baseUrl string
+	baseURL string
 	version string
 	apiKey  string
 	client  openai.Client
@@ -24,7 +24,7 @@ type Option func(*Client)
 
 func WithBaseURL(baseUrl string) Option {
 	return func(c *Client) {
-		c.baseUrl = baseUrl
+		c.baseURL = baseUrl
 	}
 }
 
@@ -42,14 +42,14 @@ func WithApiKey(apiKey string) Option {
 
 func New(options ...Option) *Client {
 	c := &Client{
-		baseUrl: "http://localhost:1234",
+		baseURL: "http://localhost:1234",
 		version: "v1",
 	}
 	for _, opt := range options {
 		opt(c)
 	}
 	reqOpts := make([]option.RequestOption, 0)
-	reqOpts = append(reqOpts, option.WithBaseURL(c.baseUrl+"/"+c.version))
+	reqOpts = append(reqOpts, option.WithBaseURL(c.baseURL+"/"+c.version))
 	reqOpts = append(reqOpts, option.WithMaxRetries(5))
 
 	if c.apiKey == "" {
