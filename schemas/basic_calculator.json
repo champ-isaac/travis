@@ -1,0 +1,26 @@
+{
+  "type": "function",
+  "function": {
+    "name": "calculator",
+    "description": "perform basic arithmetic operations",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "operator": {
+          "type": "string",
+          "description": "arithmetic operation to perform",
+          "enum": ["add", "subtract", "multiply", "divide"]
+        },
+        "first_number": {
+          "type": "number",
+          "description": "first number for the calculation"
+        },
+        "second_number": {
+          "type": "number",
+          "description": "second number for the calculation"
+        }
+      },
+      "required": ["operator", "first_number", "second_number"]
+    }
+  }
+}
