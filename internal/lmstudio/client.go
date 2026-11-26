@@ -42,11 +42,12 @@ func WithTimeout(timeout time.Duration) Option {
 func New(options ...Option) *Client {
 	c := &Client{
 		baseURL: "https://localhost:1234",
-		timeout: time.Second * 10,
+		timeout: time.Second * 10, // setup individual timeout (optional)
 	}
 	for _, option := range options {
 		option(c)
 	}
+	c.client = &http.Client{Timeout: c.timeout}
 	return c
 }
 
@@ -78,6 +79,7 @@ func (c *Client) LoadAIModel(ctx context.Context, model string) error {
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("loadAIModel: invalid status code: %d", resp.StatusCode)
 	}
+
 	data, err := json.MarshalIndent(resp.Body, "", "  ")
 	log.Printf("response body: \n%s\n", string(data))
 	return nil

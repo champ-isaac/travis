@@ -1,7 +1,17 @@
 package models
 
+type Role string
+
+const (
+	User      Role = "user"
+	System    Role = "system"
+	Assistant Role = "assistant"
+	Tool      Role = "tool"
+	Developer Role = "developer"
+)
+
 type Prompt struct {
-	Role    string `json:"role"`
+	Role    Role   `json:"role"`
 	Content string `json:"content"`
 }
 
