@@ -6,7 +6,6 @@ import (
 	"log"
 
 	"github.com/champ-isaac/travis/models"
-	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/packages/param"
 	"github.com/openai/openai-go/v3/responses"
 )
@@ -25,13 +24,7 @@ func (c *Client) AskStreaming(ctx context.Context, model string, tools []string,
 			return
 		}
 
-		completionToolUnionParam := make([]openai.ChatCompletionToolUnionParam, 0)
-
-		completionToolUnionParam, _ = c.LoadExternToolSchemas(ctx, tools...)
-		//if err != nil {
-		//	return nil, err
-		//}
-
+		// Tool support is stubbed until build step 5 replaces this function.
 		stream := c.llm.Responses.NewStreaming(ctx, responses.ResponseNewParams{
 			Model: model,
 			//PreviousResponseID: param.Opt[string]{Value: ""},
@@ -41,7 +34,6 @@ func (c *Client) AskStreaming(ctx context.Context, model string, tools []string,
 				},
 			},
 			Instructions: param.Opt[string]{Value: "You're a helpful assistant"},
-			Tools:        completionToolUnionParam,
 		})
 		for stream.Next() {
 			event := stream.Current()
