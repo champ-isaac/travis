@@ -7,9 +7,8 @@
 #   SKIP_MODEL=1 ./install_mlx_inkling2.sh # install env only
 #   MODEL_REPO=mlx-community/<other-model> MLX_LM_PKG=mlx-lm ./install_mlx_inkling2.sh
 #
-# Your system Python (3.15) is too new for some wheels (torch in particular),
-# so this uses uv to create the venv with its own managed Python 3.12.
-# Your system Python is left untouched.
+# This uses uv to create the venv with Python 3.12 (an installed one, or one uv
+# downloads). A newer system Python is left untouched.
 
 set -euo pipefail
 
@@ -19,8 +18,9 @@ PY_VERSION="${PY_VERSION:-3.12}"
 MODEL_REPO="${MODEL_REPO:-mlx-community/Inkling-2-Mini-4bit}"
 MODEL_DIR="$BASE_DIR/models/$(basename "$MODEL_REPO")"
 # Inkling 2 Mini isn't in a mlx-lm release yet; the model card says to use PR #2086.
-# Swap this for plain "mlx-lm" when running other models or once the PR is merged.
-MLX_LM_PKG="${MLX_LM_PKG:-git+https://github.com/ml-explore/mlx-lm.git@refs/pull/2086/head}"
+# Pinned to a PR #2086 commit so re-runs don't change. Swap this for plain "mlx-lm"
+# when running other models or once the PR is merged.
+MLX_LM_PKG="${MLX_LM_PKG:-git+https://github.com/ml-explore/mlx-lm.git@e2b5bbd3bd9d186dea895e60802aa765e70b9d93}"
 
 log() { printf '\n==> %s\n' "$*"; }
 
@@ -29,7 +29,7 @@ if [[ "$(uname -s)" != "Darwin" || "$(uname -m)" != "arm64" ]]; then
   echo "This script needs macOS on Apple Silicon (arm64)." >&2
   exit 1
 fi
-command -v git >/dev/null || { echo "git not found. Run: xcode-select --install" >&2; exit 1; }
+xcode-select -p >/dev/null 2>&1 || { echo "Command Line Tools (git) not found. Run: xcode-select --install" >&2; exit 1; }
 
 # --- 1. uv ------------------------------------------------------------------
 if ! command -v uv >/dev/null; then
@@ -47,7 +47,7 @@ log "uv $(uv --version)"
 mkdir -p "$BASE_DIR/models"
 if [[ ! -x "$VENV_DIR/bin/python" ]]; then
   log "Creating venv at $VENV_DIR with Python $PY_VERSION"
-  uv venv --python "$PY_VERSION" "$VENV_DIR"
+  uv venv --python "cpython-$PY_VERSION-macos-aarch64" "$VENV_DIR"
 else
   log "Reusing existing venv at $VENV_DIR"
 fi
@@ -61,6 +61,7 @@ uv pip install --python "$PY" -U mlx "$MLX_LM_PKG" huggingface_hub
 # --- 4. Verify this mlx-lm build supports the model (config.json only) ------
 log "Checking mlx-lm supports $MODEL_REPO"
 CFG_DIR="$(mktemp -d)"
+trap 'rm -rf "$CFG_DIR"' EXIT
 "$VENV_DIR/bin/hf" download "$MODEL_REPO" config.json --local-dir "$CFG_DIR" >/dev/null
 if ! "$PY" - "$CFG_DIR/config.json" <<'PYEOF'
 import importlib, json, sys
@@ -78,7 +79,6 @@ then
   echo "This mlx-lm build can't load the model. Stopping before the model download." >&2
   exit 1
 fi
-rm -rf "$CFG_DIR"
 "$PY" -c "import mlx.core as mx, mlx_lm; print('mlx', mx.__version__, '| mlx_lm', mlx_lm.__version__, '| device', mx.default_device())"
 
 # --- 5. Model download ------------------------------------------------------
