@@ -74,7 +74,7 @@ func (c *Client) AgentTask(ctx context.Context, model string, tools []string, pr
 				return nil, err
 			}
 
-			result, _ := external.Calculator(args)
+			result, _ := external.Calculator(ctx, args)
 			resp, err = c.AskCompletion(ctx, model, tools, models.Prompt{
 				Role:    models.Tool,
 				Content: strconv.FormatFloat(result, 'f', 2, 64),
@@ -107,7 +107,7 @@ func (c *Client) AskCompletion(ctx context.Context, model string, tools []string
 		return nil, err
 	}
 
-	resp, err := c.client.Chat.Completions.New(
+	resp, err := c.llm.Chat.Completions.New(
 		ctx,
 		openai.ChatCompletionNewParams{
 			Model:       model,
