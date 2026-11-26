@@ -25,7 +25,7 @@ MLX_LM_PKG="${MLX_LM_PKG:-git+https://github.com/ml-explore/mlx-lm.git@e2b5bbd3b
 log() { printf '\n==> %s\n' "$*"; }
 
 # --- 0. Sanity checks -------------------------------------------------------
-if [[ "$(uname -s)" != "Darwin" || "$(uname -m)" != "arm64" ]]; then
+if [[ "$(uname -s)" != "Darwin" || "$(sysctl -n hw.optional.arm64 2>/dev/null)" != 1 ]]; then
   echo "This script needs macOS on Apple Silicon (arm64)." >&2
   exit 1
 fi
@@ -65,10 +65,11 @@ trap 'rm -rf "$CFG_DIR"' EXIT
 "$VENV_DIR/bin/hf" download "$MODEL_REPO" config.json --local-dir "$CFG_DIR" >/dev/null
 if ! "$PY" - "$CFG_DIR/config.json" <<'PYEOF'
 import importlib, json, sys
-from mlx_lm.utils import MODEL_REMAPPING
 mt = json.load(open(sys.argv[1]))["model_type"]
-target = MODEL_REMAPPING.get(mt, mt)
+target = mt
 try:
+    from mlx_lm.utils import MODEL_REMAPPING
+    target = MODEL_REMAPPING.get(mt, mt)
     importlib.import_module(f"mlx_lm.models.{target}")
 except Exception as e:
     print(f"Cannot load mlx_lm.models.{target} for {mt}: {e!r}", file=sys.stderr)
@@ -83,9 +84,16 @@ fi
 
 # --- 5. Model download ------------------------------------------------------
 if [[ "${SKIP_MODEL:-0}" != "1" ]]; then
+  free_gb=$(( $(df -Pk "$BASE_DIR" | awk 'NR==2 {print $4}') / 1048576 ))
+  if (( free_gb < ${MIN_FREE_GB:-20} )); then
+    echo "Only $free_gb GB free in $BASE_DIR; the model needs about ${MIN_FREE_GB:-20} GB. Free space, or set MIN_FREE_GB to override." >&2
+    exit 1
+  fi
   log "Downloading $MODEL_REPO -> $MODEL_DIR"
   "$VENV_DIR/bin/hf" download "$MODEL_REPO" --local-dir "$MODEL_DIR"
 
+  ram_gb=$(( $(sysctl -n hw.memsize) / 1073741824 ))
+  (( ram_gb >= 24 )) || echo "Warning: $ram_gb GB RAM; the smoke test peaked at 17.4 GB for Inkling 2 Mini and may swap or fail." >&2
   log "Smoke test"
   "$PY" -m mlx_lm generate --model "$MODEL_DIR" \
     --prompt "Say hello in one sentence." --max-tokens 100
