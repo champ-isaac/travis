@@ -3,12 +3,12 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"os"
 
 	ai "github.com/champ-isaac/travis/internal/openai"
 	"github.com/champ-isaac/travis/models"
+	"github.com/champ-isaac/travis/pkg/utils"
 	"github.com/joho/godotenv"
 )
 
@@ -17,37 +17,92 @@ type Client struct {
 }
 
 func main() {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	c, err := New()
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return
 	}
 
 	model, err := c.getLoadedModel(ctx)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return
 	}
 	log.Println(model)
-	//result, err := c.client.AskCompletion(ctx, model, models.Prompt{
-	//	Role:    "user",
-	//	Content: "what's Golang?",
+
+	//>>>>>> AskCompletion
+	//resp, err := c.client.AskCompletion(ctx, model, []string{}, models.Prompt{
+	//	Role:    models.User,
+	//	Content: "Your name is Travis and what can you do?",
+	//}, models.Prompt{
+	//	Role:    models.Developer,
+	//	Content: "You are a helpful assistant. Use tools when needed. When you have a final answer, respond without calling any tools.",
+	//}, models.Prompt{
+	//	Role:    models.System,
+	//	Content: "you're a helpful assistant. Use tools when needed. When you have a final answer, respond without calling any tools.",
 	//})
-	out := c.client.AskStreaming(ctx, model, models.Prompt{
-		Role:    "user",
-		Content: "what's a Golang",
+
+	//>>>>>> AgentTask
+	resp, err := c.client.AgentTask(ctx, model, []string{"basic_calculator"}, models.Prompt{
+		Role:    models.User,
+		Content: "What's the capital of Taiwan?",
 	})
-	for o := range out {
-		if o.Error != nil {
-			log.Println(o.Error)
-			break
-		}
-		fmt.Print(o.Content)
-		_ = os.Stdout.Sync()
+	if err != nil {
+		log.Println(err)
+		return
 	}
+	log.Println(resp.Choices[0].Message.Content)
+	log.Println("input tokens: ", resp.Usage.PromptTokens)
+	log.Println("output tokens: ", resp.Usage.CompletionTokens)
+	log.Println("reasoning tokens: ", resp.Usage.CompletionTokensDetails.ReasoningTokens)
+
+	resp, err = c.client.AgentTask(ctx, model, []string{"basic_calculator"}, models.Prompt{
+		Role:    models.User,
+		Content: "What's is 1234 x 5678",
+	})
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	log.Println(resp.Choices[0].Message.Content)
+	log.Println("tool call: ", resp.Choices[0].Message.ToolCalls)
+	log.Println("input tokens: ", resp.Usage.PromptTokens)
+	log.Println("output tokens: ", resp.Usage.CompletionTokens)
+	log.Println("reasoning tokens: ", resp.Usage.CompletionTokensDetails.ReasoningTokens)
+
+	//>>>>>> AskStreaming
+	/*
+		out := c.client.AskStreaming(ctx, model, models.Prompt{
+			Role:    models.User,
+			Content: "who's there?",
+		}, models.Prompt{
+			Role: models.Developer,
+			Content: "you're a helpful assistant",
+		}, models.Prompt{
+			Role: models.System,
+			Content: "you're a helpful assistant",
+		})
+		for o := range out {
+			if o.Error != nil {
+				log.Println(o.Error)
+				break
+			}
+			fmt.Print(o.Content)
+			_ = os.Stdout.Sync()
+		}
+	*/
 }
 
 func New() (*Client, error) {
-	err := godotenv.Load(".env")
+	envPath, err := utils.AbsFilePath(".env")
+	if err != nil {
+		return nil, err
+	}
+	err = godotenv.Load(envPath)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +114,9 @@ func New() (*Client, error) {
 		client: ai.New(
 			ai.WithBaseURL(baseUrl),
 			ai.WithVersion(version),
-			ai.WithApiKey(token)),
+			ai.WithApiKey(token),
+			ai.WithMaxRetries(5),
+			ai.WithMaxSteps(20)),
 	}, nil
 }
 

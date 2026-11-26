@@ -15,19 +15,19 @@ var defaultLogger *slog.Logger
 var logLevel = new(slog.LevelVar)
 
 // init optional lazy initialization
-func init() {
-	jsonHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		AddSource: false,
-		Level:     logLevel,
-	})
-	defaultLogger = slog.New(jsonHandler)
-	slog.SetDefault(defaultLogger)
-}
+//func init() {
+//	jsonHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+//		AddSource: false,
+//		Level:     logLevel,
+//	})
+//	defaultLogger = slog.New(jsonHandler)
+//	slog.SetDefault(defaultLogger)
+//}
 
 // InitLogger comment init() if use this initial function
-func InitLogger(level slog.Level) *slog.Logger {
+func InitLogger(level slog.Level, enableSource bool) *slog.Logger {
 	jsonHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		AddSource: false,
+		AddSource: enableSource,
 		Level:     level,
 	})
 	logger := slog.New(jsonHandler)
