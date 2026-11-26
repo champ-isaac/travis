@@ -29,6 +29,10 @@ if [[ "$(uname -s)" != "Darwin" || "$(sysctl -n hw.optional.arm64 2>/dev/null)" 
   echo "This script needs macOS on Apple Silicon (arm64)." >&2
   exit 1
 fi
+if (( $(sw_vers -productVersion | cut -d. -f1) < 14 )); then
+  echo "mlx needs macOS 14 or newer (this Mac has $(sw_vers -productVersion))." >&2
+  exit 1
+fi
 xcode-select -p >/dev/null 2>&1 || { echo "Command Line Tools (git) not found. Run: xcode-select --install" >&2; exit 1; }
 
 # --- 1. uv ------------------------------------------------------------------
@@ -50,6 +54,8 @@ if [[ ! -x "$VENV_DIR/bin/python" ]]; then
   uv venv --python "cpython-$PY_VERSION-macos-aarch64" "$VENV_DIR"
 else
   log "Reusing existing venv at $VENV_DIR"
+  [[ "$("$VENV_DIR/bin/python" -c 'import platform; print(platform.python_version())')." == "$PY_VERSION."* ]] \
+    || echo "Warning: the existing venv's Python is not $PY_VERSION. Delete $VENV_DIR to recreate it." >&2
 fi
 PY="$VENV_DIR/bin/python"
 "$PY" --version
@@ -95,8 +101,11 @@ if [[ "${SKIP_MODEL:-0}" != "1" ]]; then
   ram_gb=$(( $(sysctl -n hw.memsize) / 1073741824 ))
   (( ram_gb >= 24 )) || echo "Warning: $ram_gb GB RAM; the smoke test peaked at 17.4 GB for Inkling 2 Mini and may swap or fail." >&2
   log "Smoke test"
-  "$PY" -m mlx_lm generate --model "$MODEL_DIR" \
-    --prompt "Say hello in one sentence." --max-tokens 100
+  out="$("$PY" -m mlx_lm generate --model "$MODEL_DIR" \
+    --prompt "Say hello in one sentence." --max-tokens 400)"
+  printf '%s\n' "$out"
+  n="$(sed -n 's/^Generation: \([0-9]*\) tokens.*/\1/p' <<<"$out")"
+  (( ${n:-0} > 0 && ${n:-0} < 400 )) || { echo "Smoke test failed: ${n:-0} tokens generated; the reply was empty or hit the 400-token limit." >&2; exit 1; }
 fi
 
 cat <<EOF
@@ -104,6 +113,12 @@ cat <<EOF
 Done.
 
 Activate:     source "$VENV_DIR/bin/activate"
+EOF
+if [[ "${SKIP_MODEL:-0}" == "1" ]]; then
+  echo "Model not downloaded (SKIP_MODEL=1). Re-run without it to download $MODEL_REPO."
+else
+  cat <<EOF
 Chat test:    python -m mlx_lm generate --model "$MODEL_DIR" --prompt "Hi" --max-tokens 200
 Serve (8080): python -m mlx_lm server --model "$MODEL_DIR" --port 8080
 EOF
+fi
