@@ -41,6 +41,8 @@ if ! command -v uv >/dev/null; then
   if command -v brew >/dev/null; then
     brew install uv
   else
+    # Runs Astral's install script, fetched live and unpinned. To avoid that,
+    # install uv yourself first (e.g. via Homebrew) and re-run this script.
     curl -LsSf https://astral.sh/uv/install.sh | sh
     export PATH="$HOME/.local/bin:$PATH"
   fi
@@ -65,6 +67,9 @@ log "Installing MLX + mlx-lm + deps"
 uv pip install --python "$PY" -U mlx "$MLX_LM_PKG" huggingface_hub
 
 # --- 4. Verify this mlx-lm build supports the model (config.json only) ------
+# This only proves mlx-lm has a module for the model's model_type. It does not
+# prove the weights load (a name mismatch like that broke the mlx-vlm attempt);
+# the smoke test in step 5 does.
 log "Checking mlx-lm supports $MODEL_REPO"
 CFG_DIR="$(mktemp -d)"
 trap 'rm -rf "$CFG_DIR"' EXIT
