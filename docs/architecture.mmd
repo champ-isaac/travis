@@ -1,0 +1,43 @@
+%% Refactored local-LLM architecture. Described in docs/architecture.md.
+%% Every model call goes router -> usage recorder -> limiter -> provider, so every call feeds the ledger.
+flowchart TB
+    cli["travis CLI"]
+    gw["cmd/gatewayd (later, optional HTTP shell)"]
+    env["environment: cloud API key, read once"]
+    registry["registry file: name, endpoint, exact server model id, capabilities, memory"]
+
+    subgraph core["core (pure Go)"]
+        run["run: local answer, cloud check, verdict"]
+        agent["agent: tool loop with full message history"]
+        tools["tools: registry, schema generated from code"]
+        router["router: request and registry to provider"]
+        transcripts["transcripts: one JSONL file per run"]
+    end
+
+    subgraph stack["provider stack, built by the router"]
+        rec["usage recorder: one ledger entry per call"]
+        lim["in-flight limiter and queue, one per endpoint"]
+        localp["local provider: OpenAI-compatible HTTP plus Inkling decoder"]
+        cloudp["cloud provider: OpenAI-compatible HTTP"]
+    end
+
+    ledger["usage ledger: JSONL"]
+    server["mlx_lm.server on :8080<br/>one model, weights, KV and prompt cache, Metal GPU"]
+    cloudapi["cloud verifier API<br/>OpenAI, Claude or Gemini"]
+
+    cli --> run
+    gw -.-> run
+    run --> router
+    run --> agent
+    run --> transcripts
+    agent --> router
+    agent --> tools
+    registry --> router
+    router --> rec
+    rec --> ledger
+    rec --> lim
+    lim --> localp
+    lim --> cloudp
+    localp --> server
+    cloudp --> cloudapi
+    env --> cloudp
