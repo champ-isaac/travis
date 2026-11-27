@@ -1,0 +1,15 @@
+{
+  "description": "A reply with thinking and a text answer, no tools offered.",
+  "captured": "2026-11-27 from mlx_lm.server on 127.0.0.1:8080, model Inkling-2-Mini-4bit, POST /v1/chat/completions, temperature 0, not streamed",
+  "request": {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Say hello in one short sentence."
+      }
+    ],
+    "temperature": 0
+  },
+  "finish_reason": "stop",
+  "content": "<|message_model|><|content_thinking|>The user asks: \"Say hello in one short sentence.\" Need answer concise. Need final only. Ensure one short sentence. Could say \"Hello!\" That's one short sentence? It's a greeting, maybe one sentence. They asked say hello in one short sentence. Answer: \"Hello!\" That's one sentence. Need no extra. Final exactly that.<|end_message|><|message_model|><|content_text|>Hello!<|end_message|>"
+}

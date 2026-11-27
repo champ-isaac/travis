@@ -1,0 +1,52 @@
+{
+  "description": "Two calculator tool calls in one reply, one block each.",
+  "captured": "2026-11-27 from mlx_lm.server on 127.0.0.1:8080, model Inkling-2-Mini-4bit, POST /v1/chat/completions, temperature 0, not streamed",
+  "request": {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Use the calculator tool to compute both 12 times 34 and 56 plus 78. Call it once for each."
+      }
+    ],
+    "tools": [
+      {
+        "type": "function",
+        "function": {
+          "name": "calculator",
+          "description": "perform basic arithmetic operations",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "operator": {
+                "type": "string",
+                "description": "arithmetic operation to perform",
+                "enum": [
+                  "add",
+                  "subtract",
+                  "multiply",
+                  "divide"
+                ]
+              },
+              "first_number": {
+                "type": "number",
+                "description": "first number for the calculation"
+              },
+              "second_number": {
+                "type": "number",
+                "description": "second number for the calculation"
+              }
+            },
+            "required": [
+              "operator",
+              "first_number",
+              "second_number"
+            ]
+          }
+        }
+      }
+    ],
+    "temperature": 0
+  },
+  "finish_reason": "stop",
+  "content": "<|message_model|><|content_thinking|>The user wants me to use the calculator tool to compute both 12 times 34 and 56 plus 78. Call it once for each.\n\nI need to make two calculator calls. They are independent, so I can make them in the same block.\n\n12 times 34: multiply 12 by 34.\n56 plus 78: add 56 and 78.\n\nLet me call the calculator tool twice.<|end_message|><|message_model|>calculator<|content_invoke_tool_json|>{\"name\":\"calculator\",\"args\":{\"first_number\":12,\"operator\":\"multiply\",\"second_number\":34}}<|end_message|><|message_model|>calculator<|content_invoke_tool_json|>{\"name\":\"calculator\",\"args\":{\"first_number\":56,\"operator\":\"add\",\"second_number\":78}}<|end_message|>"
+}
