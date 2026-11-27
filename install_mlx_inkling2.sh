@@ -5,6 +5,7 @@
 #   chmod +x install_mlx_inkling2.sh
 #   ./install_mlx_inkling2.sh              # install env + download model (~17 GB)
 #   SKIP_MODEL=1 ./install_mlx_inkling2.sh # install env only
+#   SERVE=1 ./install_mlx_inkling2.sh      # then start mlx_lm.server on 127.0.0.1:${PORT:-8080} (foreground, Ctrl-C stops)
 #   MODEL_REPO=mlx-community/<other-model> MLX_LM_PKG=mlx-lm ./install_mlx_inkling2.sh
 #
 # This uses uv to create the venv with Python 3.12 (an installed one, or one uv
@@ -126,4 +127,15 @@ else
 Chat test:    python -m mlx_lm generate --model "$MODEL_DIR" --prompt "Hi" --max-tokens 200
 Serve (8080): python -m mlx_lm server --model "$MODEL_DIR" --port 8080
 EOF
+fi
+
+# --- 6. Optional: start the server (opt-in, so a plain run still only installs) ---
+if [[ "${SERVE:-0}" == "1" ]]; then
+  [[ -f "$MODEL_DIR/config.json" ]] || { echo "No model at $MODEL_DIR; run without SKIP_MODEL first." >&2; exit 1; }
+  if lsof -nP -iTCP:"${PORT:-8080}" -sTCP:LISTEN >/dev/null 2>&1; then
+    echo "Port ${PORT:-8080} is already in use; not starting a second server." >&2
+    exit 1
+  fi
+  log "Serving $MODEL_DIR on 127.0.0.1:${PORT:-8080}"
+  exec "$PY" -m mlx_lm server --model "$MODEL_DIR" --host 127.0.0.1 --port "${PORT:-8080}"
 fi
