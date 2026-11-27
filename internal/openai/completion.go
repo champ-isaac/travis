@@ -107,7 +107,11 @@ func (c *Client) AgentTask(ctx context.Context, model string, tools []string, pr
 func (c *Client) AskCompletion(ctx context.Context, model string, tools []string, prompts ...models.Prompt) (*openai.ChatCompletion, error) {
 	completionMsgParamUnion := make([]openai.ChatCompletionMessageParamUnion, 0)
 	for _, prompt := range prompts {
-		completionMsgParamUnion = append(completionMsgParamUnion, c.ofCompletion(prompt.Role, prompt.Content))
+		msg, err := c.ofCompletion(prompt.Role, prompt.Content)
+		if err != nil {
+			return nil, err
+		}
+		completionMsgParamUnion = append(completionMsgParamUnion, msg)
 	}
 
 	completionToolUnionParam, err := c.LoadExternToolSchemas(ctx, tools...)
@@ -138,7 +142,9 @@ func (c *Client) AskCompletion(ctx context.Context, model string, tools []string
 	return resp, nil
 }
 
-func (c *Client) ofCompletion(role models.Role, content string) openai.ChatCompletionMessageParamUnion {
+// ofCompletion builds one chat message. It returns an error for a role it cannot send, so that a
+// prompt is never turned into an empty message and dropped without notice.
+func (c *Client) ofCompletion(role models.Role, content string) (openai.ChatCompletionMessageParamUnion, error) {
 	ofString := param.Opt[string]{Value: content}
 
 	switch role {
@@ -149,7 +155,7 @@ func (c *Client) ofCompletion(role models.Role, content string) openai.ChatCompl
 					OfString: ofString,
 				},
 			},
-		}
+		}, nil
 	case "user":
 		return openai.ChatCompletionMessageParamUnion{
 			OfUser: &openai.ChatCompletionUserMessageParam{
@@ -157,7 +163,7 @@ func (c *Client) ofCompletion(role models.Role, content string) openai.ChatCompl
 					OfString: ofString,
 				},
 			},
-		}
+		}, nil
 	case "assistant":
 		return openai.ChatCompletionMessageParamUnion{
 			OfAssistant: &openai.ChatCompletionAssistantMessageParam{
@@ -165,7 +171,7 @@ func (c *Client) ofCompletion(role models.Role, content string) openai.ChatCompl
 					OfString: ofString,
 				},
 			},
-		}
+		}, nil
 	case "tool":
 		return openai.ChatCompletionMessageParamUnion{
 			OfTool: &openai.ChatCompletionToolMessageParam{
@@ -173,7 +179,7 @@ func (c *Client) ofCompletion(role models.Role, content string) openai.ChatCompl
 					OfString: ofString,
 				},
 			},
-		}
+		}, nil
 	case "developer":
 		return openai.ChatCompletionMessageParamUnion{
 			OfDeveloper: &openai.ChatCompletionDeveloperMessageParam{
@@ -181,12 +187,11 @@ func (c *Client) ofCompletion(role models.Role, content string) openai.ChatCompl
 					OfString: ofString,
 				},
 			},
-		}
+		}, nil
 	case "function":
-		log.Println("function role is deprecated and don't use this role")
-		return openai.ChatCompletionMessageParamUnion{}
+		return openai.ChatCompletionMessageParamUnion{}, fmt.Errorf("unsupported prompt role %q: the function role is deprecated", role)
 	default:
-		return openai.ChatCompletionMessageParamUnion{}
+		return openai.ChatCompletionMessageParamUnion{}, fmt.Errorf("unsupported prompt role %q", role)
 	}
 }
 

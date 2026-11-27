@@ -297,7 +297,11 @@ func TestLoadExternToolSchemas(t *testing.T) {
 func TestOfCompletion(t *testing.T) {
 	c := New(WithApiKey("k"))
 	for _, role := range []models.Role{models.User, models.System, models.Assistant, models.Tool, models.Developer} {
-		b, err := json.Marshal(c.ofCompletion(role, "text"))
+		msg, err := c.ofCompletion(role, "text")
+		if err != nil {
+			t.Fatalf("%s: unexpected error %v", role, err)
+		}
+		b, err := json.Marshal(msg)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -309,12 +313,35 @@ func TestOfCompletion(t *testing.T) {
 			t.Errorf("%s: marshalled to %s, want role %q and content text", role, b, role)
 		}
 	}
-	// the deprecated "function" role and unknown roles give an empty message, not a panic
-	for _, role := range []models.Role{"function", "bogus"} {
-		b, _ := json.Marshal(c.ofCompletion(role, "text"))
-		if strings.Contains(string(b), "text") {
-			t.Errorf("%q: marshalled to %s, want an empty message", role, b)
+	// the deprecated "function" role, an empty role and unknown roles are errors, never an empty message
+	for _, role := range []models.Role{"function", "", "bogus"} {
+		msg, err := c.ofCompletion(role, "text")
+		if err == nil || !strings.Contains(err.Error(), fmt.Sprintf("unsupported prompt role %q", role)) {
+			t.Errorf("%q: err = %v, want an unsupported prompt role error", role, err)
 		}
+		if b, _ := json.Marshal(msg); strings.Contains(string(b), "text") {
+			t.Errorf("%q: returned a message %s along with the error", role, b)
+		}
+	}
+}
+
+// A prompt with a role the code cannot send used to go out as a null message, and the server answered as
+// if the prompt did not exist. Now the call fails before any request is made.
+func TestAskCompletion_RejectsAnUnsupportedRoleWithoutCallingTheServer(t *testing.T) {
+	for _, role := range []models.Role{"bogus", "function", ""} {
+		t.Run(fmt.Sprintf("role %q", role), func(t *testing.T) {
+			c, seen := scripted(t, ok("never"))
+			resp, err := c.AskCompletion(context.Background(), "m", nil, prompt(models.User, "hi"), prompt(role, "x"))
+			if err == nil || !strings.Contains(err.Error(), fmt.Sprintf("unsupported prompt role %q", role)) {
+				t.Fatalf("err = %v, want an unsupported prompt role error", err)
+			}
+			if resp != nil {
+				t.Errorf("resp = %v, want nil on error", resp)
+			}
+			if n := len(seen()); n != 0 {
+				t.Errorf("requests = %d, want 0", n)
+			}
+		})
 	}
 }
 
