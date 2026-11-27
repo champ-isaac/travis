@@ -2,9 +2,7 @@ package openai
 
 import (
 	"context"
-	"log"
 
-	"github.com/champ-isaac/travis/external"
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
 	"github.com/openai/openai-go/v3/packages/pagination"
@@ -17,7 +15,6 @@ type Client struct {
 	maxRetries int
 	maxSteps   int
 	llm        openai.Client
-	tools      *external.ToolRegistry[any, any]
 }
 
 type Option func(*Client)
@@ -54,7 +51,7 @@ func WithMaxRetries(maxRetries int) Option {
 
 func New(options ...Option) *Client {
 	c := &Client{ // defaults
-		baseURL:    "http://localhost:1234",
+		baseURL:    "http://localhost:8080",
 		version:    "v1",
 		maxRetries: 5,
 		maxSteps:   20,
@@ -65,11 +62,7 @@ func New(options ...Option) *Client {
 	reqOpts := make([]option.RequestOption, 0)
 	reqOpts = append(reqOpts, option.WithBaseURL(c.baseURL+"/"+c.version))
 	reqOpts = append(reqOpts, option.WithMaxRetries(c.maxRetries))
-
-	if c.apiKey == "" {
-		log.Println("api key can't be empty")
-		return nil
-	}
+	// An empty key is fine: the SDK then sends no Authorization header (mlx_lm.server needs none).
 	reqOpts = append(reqOpts, option.WithAPIKey(c.apiKey))
 	c.llm = openai.NewClient(reqOpts...)
 	return c
