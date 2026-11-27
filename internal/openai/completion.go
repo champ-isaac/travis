@@ -3,8 +3,10 @@ package openai
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/champ-isaac/travis/external"
@@ -32,6 +34,9 @@ func (c *Client) AgentTask(ctx context.Context, model string, tools []string, pr
 	//messages := make([]string, 0)
 	//messages := make([]openai.ChatCompletionMessage, 0)
 	resp, err := c.AskCompletion(ctx, model, tools, prompts...)
+	if err != nil {
+		return nil, err
+	}
 
 	//resp, err := c.client.Chat.Completions.New(
 	//	ctx,
@@ -74,11 +79,17 @@ func (c *Client) AgentTask(ctx context.Context, model string, tools []string, pr
 				return nil, err
 			}
 
-			result, _ := external.Calculator(ctx, args)
+			result, err := external.Calculator(ctx, args)
+			if err != nil {
+				return nil, err
+			}
 			resp, err = c.AskCompletion(ctx, model, tools, models.Prompt{
 				Role:    models.Tool,
 				Content: strconv.FormatFloat(result, 'f', 2, 64),
 			})
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -94,15 +105,12 @@ func (c *Client) AgentTask(ctx context.Context, model string, tools []string, pr
 }
 
 func (c *Client) AskCompletion(ctx context.Context, model string, tools []string, prompts ...models.Prompt) (*openai.ChatCompletion, error) {
-	var err error
 	completionMsgParamUnion := make([]openai.ChatCompletionMessageParamUnion, 0)
 	for _, prompt := range prompts {
 		completionMsgParamUnion = append(completionMsgParamUnion, c.ofCompletion(prompt.Role, prompt.Content))
 	}
 
-	completionToolUnionParam := make([]openai.ChatCompletionToolUnionParam, 0)
-
-	completionToolUnionParam, err = c.LoadExternToolSchemas(ctx, tools...)
+	completionToolUnionParam, err := c.LoadExternToolSchemas(ctx, tools...)
 	if err != nil {
 		return nil, err
 	}
@@ -123,6 +131,9 @@ func (c *Client) AskCompletion(ctx context.Context, model string, tools []string
 
 	if err != nil {
 		return nil, err
+	}
+	if len(resp.Choices) == 0 {
+		return nil, fmt.Errorf("server returned no choices for model %q", model)
 	}
 	return resp, nil
 }
@@ -181,6 +192,19 @@ func (c *Client) ofCompletion(role models.Role, content string) openai.ChatCompl
 
 func (c *Client) LoadExternToolSchemas(ctx context.Context, tools ...string) ([]openai.ChatCompletionToolUnionParam, error) {
 	completionTools := make([]openai.ChatCompletionToolUnionParam, 0)
+	if len(tools) == 0 {
+		return completionTools, nil
+	}
+	projectRoot, err := utils.ProjectRoot()
+	if err != nil {
+		return nil, err
+	}
+	// os.Root confines every read to the project root, so a tool name cannot reach a file outside it.
+	root, err := os.OpenRoot(projectRoot)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = root.Close() }() // read-only, nothing to flush
 	//responses.ToolUnionParam{
 	//	OfFunction:           nil,
 	//	OfFileSearch:         nil,
@@ -203,7 +227,14 @@ func (c *Client) LoadExternToolSchemas(ctx context.Context, tools ...string) ([]
 		if err != nil {
 			return nil, err
 		}
-		bs, err := os.ReadFile(absPath)
+		if absPath == "" {
+			return nil, fmt.Errorf("schema file for tool %q not found under %s", tool, projectRoot)
+		}
+		relPath, err := filepath.Rel(projectRoot, absPath)
+		if err != nil {
+			return nil, err
+		}
+		bs, err := root.ReadFile(relPath)
 		if err != nil {
 			return nil, err
 		}
