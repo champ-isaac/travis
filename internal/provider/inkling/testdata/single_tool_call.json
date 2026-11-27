@@ -1,0 +1,52 @@
+{
+  "description": "One calculator tool call after thinking.",
+  "captured": "2026-11-27 from mlx_lm.server on 127.0.0.1:8080, model Inkling-2-Mini-4bit, POST /v1/chat/completions, temperature 0, not streamed",
+  "request": {
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is 1234 x 5678? Use the calculator tool."
+      }
+    ],
+    "tools": [
+      {
+        "type": "function",
+        "function": {
+          "name": "calculator",
+          "description": "perform basic arithmetic operations",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "operator": {
+                "type": "string",
+                "description": "arithmetic operation to perform",
+                "enum": [
+                  "add",
+                  "subtract",
+                  "multiply",
+                  "divide"
+                ]
+              },
+              "first_number": {
+                "type": "number",
+                "description": "first number for the calculation"
+              },
+              "second_number": {
+                "type": "number",
+                "description": "second number for the calculation"
+              }
+            },
+            "required": [
+              "operator",
+              "first_number",
+              "second_number"
+            ]
+          }
+        }
+      }
+    ],
+    "temperature": 0
+  },
+  "finish_reason": "stop",
+  "content": "<|message_model|><|content_thinking|>The user wants 1234 x 5678 using calculator tool. Need compute accurately. We can use calculator tool. Need perform multiplication. Let's use calculator.<|end_message|><|message_model|>calculator<|content_invoke_tool_json|>{\"name\":\"calculator\",\"args\":{\"first_number\":1234,\"operator\":\"multiply\",\"second_number\":5678}}<|end_message|>"
+}
