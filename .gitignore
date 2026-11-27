@@ -140,3 +140,6 @@ fabric.properties
 
 # Go workspace file
 
+
+# Local API key for mlx-keyproxy
+.apiKey
