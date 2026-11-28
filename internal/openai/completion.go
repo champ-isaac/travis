@@ -104,7 +104,19 @@ func (c *Client) AgentTask(ctx context.Context, model string, tools []string, pr
 	return resp, nil
 }
 
+// AskCompletion is Complete at the fixed temperature 0.7, and it also asks for log-probabilities, as it always has.
 func (c *Client) AskCompletion(ctx context.Context, model string, tools []string, prompts ...models.Prompt) (*openai.ChatCompletion, error) {
+	return c.complete(ctx, model, 0.7, true, tools, prompts...)
+}
+
+// Complete sends one chat completion. The temperature is always sent, 0 included, so a caller that
+// asks for 0 gets 0 and not the server's default. It does not ask for log-probabilities: nothing
+// reads them, and they make every reply larger.
+func (c *Client) Complete(ctx context.Context, model string, temperature float64, tools []string, prompts ...models.Prompt) (*openai.ChatCompletion, error) {
+	return c.complete(ctx, model, temperature, false, tools, prompts...)
+}
+
+func (c *Client) complete(ctx context.Context, model string, temperature float64, logprobs bool, tools []string, prompts ...models.Prompt) (*openai.ChatCompletion, error) {
 	completionMsgParamUnion := make([]openai.ChatCompletionMessageParamUnion, 0)
 	for _, prompt := range prompts {
 		msg, err := c.ofCompletion(prompt.Role, prompt.Content)
@@ -119,20 +131,20 @@ func (c *Client) AskCompletion(ctx context.Context, model string, tools []string
 		return nil, err
 	}
 
-	resp, err := c.llm.Chat.Completions.New(
-		ctx,
-		openai.ChatCompletionNewParams{
-			Model:       model,
-			Messages:    completionMsgParamUnion,
-			Temperature: param.Opt[float64]{Value: 0.7},
-			Logprobs:    param.Opt[bool]{Value: true},
-			Tools:       completionToolUnionParam,
-			//StreamOptions: openai.ChatCompletionStreamOptionsParam{
-			//	IncludeObfuscation: param.Opt[bool]{Value: true},
-			//	IncludeUsage:       param.Opt[bool]{Value: true},
-			//},
-		})
-
+	params := openai.ChatCompletionNewParams{
+		Model:       model,
+		Messages:    completionMsgParamUnion,
+		Temperature: openai.Float(temperature), // not param.Opt{Value: t}: that leaves 0 out of the request
+		Tools:       completionToolUnionParam,
+		//StreamOptions: openai.ChatCompletionStreamOptionsParam{
+		//	IncludeObfuscation: param.Opt[bool]{Value: true},
+		//	IncludeUsage:       param.Opt[bool]{Value: true},
+		//},
+	}
+	if logprobs {
+		params.Logprobs = param.Opt[bool]{Value: true}
+	}
+	resp, err := c.llm.Chat.Completions.New(ctx, params)
 	if err != nil {
 		return nil, err
 	}

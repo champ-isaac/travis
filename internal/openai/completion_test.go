@@ -360,3 +360,46 @@ func TestNewOptions(t *testing.T) {
 		t.Errorf("options not applied: %+v", c)
 	}
 }
+
+func TestComplete_SendsTheGivenTemperature(t *testing.T) {
+	for _, temp := range []float64{0, 0.3, 1.5} {
+		c, seen := scripted(t, ok("hi"))
+		if _, err := c.Complete(context.Background(), "m", temp, nil, prompt(models.User, "x")); err != nil {
+			t.Fatal(err)
+		}
+		got, present := seen()[0].body["temperature"]
+		if !present || got != temp {
+			t.Errorf("temperature %v: request had %v (present %v), want %v sent explicitly, 0 included", temp, got, present, temp)
+		}
+	}
+}
+
+func TestAskCompletion_StillSendsTemperature07(t *testing.T) {
+	c, seen := scripted(t, ok("hi"))
+	if _, err := c.AskCompletion(context.Background(), "m", nil, prompt(models.User, "x")); err != nil {
+		t.Fatal(err)
+	}
+	if got := seen()[0].body["temperature"]; got != 0.7 {
+		t.Errorf("temperature = %v, want 0.7 (AskCompletion's behaviour must not change)", got)
+	}
+}
+
+func TestComplete_DoesNotAskForLogprobs(t *testing.T) {
+	c, seen := scripted(t, ok("hi"))
+	if _, err := c.Complete(context.Background(), "m", 0, nil, prompt(models.User, "x")); err != nil {
+		t.Fatal(err)
+	}
+	if got, present := seen()[0].body["logprobs"]; present && got != false {
+		t.Errorf("logprobs = %v, want it left out: nothing reads the log-probabilities and they make every reply larger", got)
+	}
+}
+
+func TestAskCompletion_StillAsksForLogprobs(t *testing.T) {
+	c, seen := scripted(t, ok("hi"))
+	if _, err := c.AskCompletion(context.Background(), "m", nil, prompt(models.User, "x")); err != nil {
+		t.Fatal(err)
+	}
+	if got := seen()[0].body["logprobs"]; got != true {
+		t.Errorf("logprobs = %v, want true (AskCompletion's behaviour must not change)", got)
+	}
+}
